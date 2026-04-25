@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { getTopScores, HighScoreEntry } from '../lib/gameService';
-import { Trophy, Users } from 'lucide-react';
+import { Trophy, Users, Palette } from 'lucide-react';
+import { THEMES } from './GameCanvas';
 
 interface SplashProps {
   onStart: () => void;
+  themeId: string;
+  onThemeChange: (id: string) => void;
 }
 
-export const Splash: React.FC<SplashProps> = ({ onStart }) => {
+export const Splash: React.FC<SplashProps> = ({ onStart, themeId, onThemeChange }) => {
   const [leaderboard, setLeaderboard] = useState<HighScoreEntry[]>([]);
 
   useEffect(() => {
@@ -19,7 +22,8 @@ export const Splash: React.FC<SplashProps> = ({ onStart }) => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-[#f4ece1] z-[1000] flex flex-col items-center justify-start py-20 overflow-y-auto px-4"
+      className="fixed inset-0 z-[1000] flex flex-col items-center justify-start py-20 overflow-y-auto px-4 transition-colors duration-500"
+      style={{ backgroundColor: THEMES[themeId]?.bg || '#f4ece1' }}
     >
       <div className="flex flex-col items-center mb-12">
         <span className="text-4xl mb-4 transform rotate-12">🫖</span>
@@ -80,6 +84,35 @@ export const Splash: React.FC<SplashProps> = ({ onStart }) => {
               <p className="text-xs font-black uppercase tracking-[0.2em] italic text-[#f4ece1]/40">Waiting for masters...</p>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Theme Selector */}
+      <div className="w-full max-w-5xl px-4 mb-12">
+        <div className="glass-panel p-8 rounded-3xl border-2 border-[#4a3424] bg-white/40">
+          <h2 className="text-[#d97706] font-black text-lg mb-6 uppercase flex items-center gap-2 border-b-2 border-[#4a3424] pb-2">
+            <Palette size={20} strokeWidth={3} /> SELECT KITCHEN THEME
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {Object.values(THEMES).map((t) => (
+              <button
+                key={t.id}
+                onClick={() => onThemeChange(t.id)}
+                className={`flex flex-col items-center p-4 rounded-2xl border-[3px] transition-all transform hover:scale-105 ${
+                  themeId === t.id 
+                    ? 'bg-[#4a3424] text-white border-yellow-400 shadow-[6px_6px_0px_#d97706]' 
+                    : 'bg-[#f4ece1]/80 text-[#4a3424] border-[#4a3424] hover:bg-white'
+                }`}
+              >
+                <span className="text-3xl mb-2">{t.powerEmoji}</span>
+                <span className="font-black uppercase text-sm tracking-tight">{t.name}</span>
+                <div className="flex gap-1 mt-2">
+                  <div className="w-4 h-4 rounded-full border border-black/20" style={{ backgroundColor: t.bg }}></div>
+                  <div className="w-4 h-4 rounded-full border border-black/20" style={{ backgroundColor: `#${t.wall.toString(16).padStart(6, '0')}` }}></div>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

@@ -1,8 +1,61 @@
 import React, { useRef, useEffect } from 'react';
 import * as Phaser from 'phaser';
 
+interface GameTheme {
+  id: string;
+  name: string;
+  bg: string;
+  wall: number;
+  wallStroke: number;
+  dot: number;
+  powerEmoji: string;
+  playerColor: number;
+  playerMouth: string;
+  accent: string;
+}
+
+export const THEMES: Record<string, GameTheme> = {
+  teahouse: {
+    id: 'teahouse',
+    name: 'Tea House',
+    bg: '#f4ece1',
+    wall: 0xd97706,
+    wallStroke: 0x4a3424,
+    dot: 0xd97706,
+    powerEmoji: '🥟',
+    playerColor: 0xfacc15,
+    playerMouth: '#f4ece1',
+    accent: '#4a3424'
+  },
+  bamboo: {
+    id: 'bamboo',
+    name: 'Bamboo Garden',
+    bg: '#ecfdf5',
+    wall: 0x059669,
+    wallStroke: 0x064e3b,
+    dot: 0x10b981,
+    powerEmoji: '🍑',
+    playerColor: 0xffedd5,
+    playerMouth: '#ecfdf5',
+    accent: '#064e3b'
+  },
+  market: {
+    id: 'market',
+    name: 'Market Street',
+    bg: '#fff1f2',
+    wall: 0xe11d48,
+    wallStroke: 0x4c0519,
+    dot: 0xf43f5e,
+    powerEmoji: '🍞',
+    playerColor: 0xfde047,
+    playerMouth: '#fff1f2',
+    accent: '#4c0519'
+  }
+};
+
 interface GameCanvasProps {
   stage: number;
+  themeId: string;
   onGameOver: (score: number) => void;
   onVictory: (score: number) => void;
   onScoreUpdate: (score: number) => void;
@@ -70,6 +123,7 @@ class MainScene extends Phaser.Scene {
     D: Phaser.Input.Keyboard.Key;
   };
   pTimer: Phaser.Time.TimerEvent | null = null;
+  fTimer: Phaser.Time.TimerEvent | null = null;
   
   // Callbacks
   onGameOverCallback: (score: number) => void;
@@ -78,6 +132,8 @@ class MainScene extends Phaser.Scene {
   onLoseLifeCallback: () => void;
   stage: number;
   lives: number;
+  theme: GameTheme;
+  themeId: string;
 
   constructor(
     onGameOver: (score: number) => void,
@@ -85,7 +141,8 @@ class MainScene extends Phaser.Scene {
     onScoreUpdate: (score: number) => void,
     onLoseLife: () => void,
     stage: number,
-    lives: number
+    lives: number,
+    themeId: string
   ) {
     super('MainScene');
     this.sfx = new SoundSynth();
@@ -95,29 +152,31 @@ class MainScene extends Phaser.Scene {
     this.onLoseLifeCallback = onLoseLife;
     this.stage = stage;
     this.lives = lives;
+    this.themeId = themeId;
+    this.theme = THEMES[themeId] || THEMES.teahouse;
   }
 
   preload() {
-    // Power - Dumpling Emoji
+    // Power - Theme-specific Emoji
     const powerCanvas = this.textures.createCanvas('power', 32, 32);
     if (powerCanvas) {
       const ctx = powerCanvas.getContext();
       ctx.font = '24px serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('🥟', 16, 16);
+      ctx.fillText(this.theme.powerEmoji, 16, 16);
       powerCanvas.refresh();
     }
 
     const g = this.add.graphics();
     
-    // Player - Chef character in Pacman style
-    g.lineStyle(2, 0x4a3424);
-    g.fillStyle(0xfacc15);
+    // Player - Chef theme
+    g.lineStyle(2, this.theme.wallStroke);
+    g.fillStyle(this.theme.playerColor);
     g.fillCircle(16, 16, 14);
     g.strokeCircle(16, 16, 14);
     
-    g.fillStyle(0xf4ece1); // Matches background for mouth
+    g.fillStyle(Phaser.Display.Color.HexStringToColor(this.theme.playerMouth).color);
     g.beginPath();
     g.moveTo(16, 16);
     g.lineTo(32, 8);
@@ -125,21 +184,20 @@ class MainScene extends Phaser.Scene {
     g.closePath();
     g.fillPath();
     
-    // Tiny Chef hat line or just eye
-    g.fillStyle(0x4a3424);
+    g.fillStyle(this.theme.wallStroke);
     g.fillCircle(20, 8, 2);
     
     g.generateTexture('player', 32, 32);
     g.clear();
 
-    // Wall - Steamer Basket theme
-    g.fillStyle(0xd97706); // Wood/Bamboo color
+    // Wall - Theme-specific
+    g.fillStyle(this.theme.wall);
     g.fillRoundedRect(2, 2, 28, 28, 6);
-    g.lineStyle(3, 0x4a3424);
+    g.lineStyle(3, this.theme.wallStroke);
     g.strokeRoundedRect(2, 2, 28, 28, 6);
     
-    // Add some bamboo texture lines
-    g.lineStyle(1, 0x4a3424, 0.3);
+    // Pattern lines
+    g.lineStyle(1, this.theme.wallStroke, 0.3);
     g.moveTo(8, 4); g.lineTo(8, 28);
     g.moveTo(16, 4); g.lineTo(16, 28);
     g.moveTo(24, 4); g.lineTo(24, 28);
@@ -148,16 +206,16 @@ class MainScene extends Phaser.Scene {
     g.generateTexture('wall', 32, 32);
     g.clear();
 
-    // Dot - Golden Sesame
-    g.fillStyle(0x4a3424); // Outline for dot
+    // Dot - Theme-specific
+    g.fillStyle(this.theme.wallStroke);
     g.fillCircle(16, 16, 4);
-    g.fillStyle(0xd97706);
+    g.fillStyle(this.theme.dot);
     g.fillCircle(16, 16, 2.5);
     g.generateTexture('dot', 32, 32);
     g.clear();
 
-    // Ghost - Tea Ghost style
-    g.lineStyle(2, 0x4a3424);
+    // Ghost - Theme-specific styling
+    g.lineStyle(2, this.theme.wallStroke);
     g.fillStyle(0xffffff);
     g.beginPath();
     g.arc(16, 14, 12, Math.PI, 0);
@@ -171,7 +229,7 @@ class MainScene extends Phaser.Scene {
     g.strokePath();
     
     // Eyes
-    g.fillStyle(0x4a3424);
+    g.fillStyle(this.theme.wallStroke);
     g.fillCircle(12, 12, 2);
     g.fillCircle(20, 12, 2);
     
@@ -204,6 +262,12 @@ class MainScene extends Phaser.Scene {
 
     const midX = Math.floor(width / 2);
     const midY = Math.floor(height / 2);
+
+    // Open Tunnels on sides
+    maze[midY][0] = 0;
+    maze[midY][1] = 0;
+    maze[midY][width - 2] = 0;
+    maze[midY][width - 1] = 0;
 
     // Player spawn area - clarify paths
     for (let y = 1; y <= 2; y++) {
@@ -337,11 +401,11 @@ class MainScene extends Phaser.Scene {
     const mx = midX * 32 + 16;
     const my = midY * 32 + 16;
 
-    this.createGhost(mx, my - 64, 0xff4444, 'left');
-    this.createGhost(mx - 64, my, 0x22c55e, 'right');
-    this.createGhost(mx + 64, my, 0xec4899, 'up');
+    this.createGhost(mx, my - 64, 0xff4444, 'left', 'chase');
+    this.createGhost(mx - 64, my, 0x22c55e, 'right', 'ambush');
+    this.createGhost(mx + 64, my, 0xec4899, 'up', 'patrol');
 
-    if (this.stage >= 2) this.createGhost(mx, my, 0x00ffff, 'down');
+    if (this.stage >= 2) this.createGhost(mx, my, 0x00ffff, 'down', 'shy');
 
     this.physics.add.collider(this.player, this.walls);
     this.physics.add.overlap(this.player, this.dots, (_, d: any) => {
@@ -369,11 +433,12 @@ class MainScene extends Phaser.Scene {
     this.sfx.init();
   }
 
-  createGhost(x: number, y: number, color: number, dir: string) {
+  createGhost(x: number, y: number, color: number, dir: string, role: string) {
     const g = this.ghosts.create(x, y, 'ghost');
     g.setTint(color);
     g.setData('color', color);
     g.setData('dir', dir);
+    g.setData('role', role);
     g.body.setCircle(12, 4, 4);
     this.physics.add.collider(g, this.walls);
   }
@@ -388,17 +453,52 @@ class MainScene extends Phaser.Scene {
 
   startPowerMode() {
     this.isPowerMode = true;
-    this.ghosts.getChildren().forEach((g: any) => g.setTint(0x3b82f6));
+    this.ghosts.getChildren().forEach((g: any) => {
+      g.setTint(0x3b82f6);
+      this.tweens.add({
+        targets: g,
+        scale: 1.3,
+        duration: 400,
+        yoyo: true,
+        repeat: -1
+      });
+    });
 
     if (this.pTimer) this.pTimer.remove();
+    if (this.fTimer) this.fTimer.remove();
+
+    // Flashing effect for warning
+    this.fTimer = this.time.delayedCall(6000, () => {
+      if (this.isPowerMode) {
+        this.ghosts.getChildren().forEach((g: any) => {
+          this.tweens.add({
+            targets: g,
+            tint: 0xffffff,
+            duration: 200,
+            yoyo: true,
+            repeat: -1
+          });
+        });
+      }
+    });
+
     this.pTimer = this.time.delayedCall(8000, () => {
       this.isPowerMode = false;
-      this.ghosts.getChildren().forEach((g: any) => g.setTint(g.getData('color')));
+      this.ghosts.getChildren().forEach((g: any) => {
+        this.tweens.killTweensOf(g);
+        g.setTint(g.getData('color'));
+        g.setScale(1);
+        g.setAlpha(1);
+      });
 
       while (this.respawnQueue.length > 0) {
         const color = this.respawnQueue.shift();
         if (color !== undefined) {
-          this.createGhost(304, 240, color, 'up');
+          const midX = Math.floor(25 / 2) * 32 + 16;
+          const midY = Math.floor(19 / 2) * 32 + 16;
+          const roles = ['chase', 'ambush', 'patrol', 'shy'];
+          const role = roles[this.respawnQueue.length % roles.length];
+          this.createGhost(midX, midY, color, 'up', role);
         }
       }
     });
@@ -456,7 +556,7 @@ class MainScene extends Phaser.Scene {
     ];
     
     this.ghosts.getChildren().forEach((child: any, i) => {
-        const pos = ghostPositions[i] || { x: 304, y: 240 };
+        const pos = ghostPositions[i] || { x: midX, y: midY };
         child.x = pos.x;
         child.y = pos.y;
         child.setVelocity(0);
@@ -465,7 +565,9 @@ class MainScene extends Phaser.Scene {
 
   checkWall(x: number, y: number) {
     const tx = Math.floor(x / 32), ty = Math.floor(y / 32);
-    return (this.maze[ty] && this.maze[ty][tx] === 1);
+    if (ty < 0 || ty >= this.maze.length) return false;
+    if (tx < 0 || tx >= this.maze[0].length) return false;
+    return this.maze[ty][tx] === 1;
   }
 
   update() {
@@ -528,15 +630,16 @@ class MainScene extends Phaser.Scene {
     }
 
     // Tunneling
-    if (this.player.x < 0) this.player.x = 25 * 32;
-    if (this.player.x > 25 * 32) this.player.x = 0;
+    const worldWidth = 25 * 32;
+    if (this.player.x < -16) this.player.x = worldWidth + 16;
+    if (this.player.x > worldWidth + 16) this.player.x = -16;
 
     this.ghosts.getChildren().forEach((g: any) => {
       const speed = this.isPowerMode ? this.ghostSpeed * 0.5 : this.ghostSpeed;
       let dir = g.getData('dir');
+      const role = g.getData('role');
       const gx = g.x, gy = g.y;
       
-      // Calculate more precise center detection
       const centerX = Math.floor(gx / 32) * 32 + 16;
       const centerY = Math.floor(gy / 32) * 32 + 16;
       const isAtCenter = Math.abs(gx - centerX) < 4 && Math.abs(gy - centerY) < 4;
@@ -547,11 +650,9 @@ class MainScene extends Phaser.Scene {
       else if (dir === 'up') blocked = this.checkWall(gx, gy - 20);
       else if (dir === 'down') blocked = this.checkWall(gx, gy + 20);
 
-      // If hit a wall or at an intersection center, consider turning
       if (blocked || isAtCenter) {
         const canContinue = !blocked;
         const opts = (['left', 'right', 'up', 'down'] as string[]).filter(d => {
-          // Avoid immediate reversal unless necessary
           const reverseMap: Record<string, string> = { left: 'right', right: 'left', up: 'down', down: 'up' };
           if (!blocked && d === reverseMap[dir]) return false;
           
@@ -563,12 +664,61 @@ class MainScene extends Phaser.Scene {
         });
 
         if (opts.length > 0) {
-          // If hit wall, pick any option. If at center, random chance to branch.
-          if (blocked || Math.random() < 0.3) {
-            dir = Phaser.Utils.Array.GetRandom(opts);
-            g.setData('dir', dir);
-            g.x = centerX; // Snap to center briefly when turning to align with paths
+          if (this.isPowerMode) {
+             // Frightened: Random movement
+             if (blocked || Math.random() < 0.3) {
+               dir = Phaser.Utils.Array.GetRandom(opts);
+             }
+          } else {
+             // AI Decisions
+             let target = { x: this.player.x, y: this.player.y };
+             
+             if (role === 'ambush') {
+               // Pinky style: target ahead
+               const pvx = this.player.body.velocity.x;
+               const pvy = this.player.body.velocity.y;
+               target.x += (pvx / this.moveSpeed) * 32 * 4;
+               target.y += (pvy / this.moveSpeed) * 32 * 4;
+             } else if (role === 'patrol') {
+               // Patrol top right corner area
+               target = { x: (25 - 2) * 32, y: 32 * 2 };
+             } else if (role === 'shy') {
+               // Clyde style: switch between chasing and fleeing
+               const dist = Phaser.Math.Distance.Between(gx, gy, this.player.x, this.player.y);
+               if (dist < 32 * 6) {
+                 target = { x: 32, y: (19-2) * 32 }; // Flee to bottom left
+               }
+             }
+
+             // Find best direction
+             let bestDir = dir;
+             if (blocked || isAtCenter) {
+               let minDist = Infinity;
+               opts.forEach(o => {
+                 let nx = centerX, ny = centerY;
+                 if (o === 'left') nx -= 32;
+                 if (o === 'right') nx += 32;
+                 if (o === 'up') ny -= 32;
+                 if (o === 'down') ny += 32;
+                 const d = Phaser.Math.Distance.Between(nx, ny, target.x, target.y);
+                 if (d < minDist) {
+                   minDist = d;
+                   bestDir = o;
+                 }
+               });
+               
+               // Some randomness to prevent perfect stacking
+               if (Math.random() < 0.05 && opts.length > 1) {
+                 bestDir = Phaser.Utils.Array.GetRandom(opts);
+               }
+               dir = bestDir;
+             }
+          }
+          
+          if (dir !== g.getData('dir')) {
+            g.x = centerX;
             g.y = centerY;
+            g.setData('dir', dir);
           }
         }
       }
@@ -578,14 +728,16 @@ class MainScene extends Phaser.Scene {
       else if (dir === 'down') g.setVelocity(0, speed);
 
       // Ghost Tunneling
-      if (g.x < 0) g.x = 25 * 32;
-      if (g.x > 25 * 32) g.x = 0;
+      const worldWidth = 25 * 32;
+      if (g.x < -16) g.x = worldWidth + 16;
+      if (g.x > worldWidth + 16) g.x = -16;
     });
   }
 }
 
 export const GameCanvas: React.FC<GameCanvasProps> = ({
   stage,
+  themeId,
   onGameOver,
   onVictory,
   onScoreUpdate,
@@ -619,9 +771,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         (s) => callbacksRef.current.onScoreUpdate(s),
         () => callbacksRef.current.onLoseLife(),
         stage,
-        lives
+        lives,
+        themeId
       ),
-      backgroundColor: '#f4ece1', // Authentic Paper/Cloth background
+      backgroundColor: THEMES[themeId]?.bg || '#f4ece1',
     };
 
     gameRef.current = new Phaser.Game(config);
@@ -632,7 +785,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         gameRef.current = null;
       }
     };
-  }, [stage]); // Only depends on stage
+  }, [stage, themeId]); // Only depends on stage or theme change
 
   useEffect(() => {
     if (gameRef.current) {
@@ -653,6 +806,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     <div
       ref={containerRef}
       className="rounded-[2.5rem] shadow-[12px_12px_0px_#4a3424] border-[6px] border-[#4a3424] overflow-hidden"
+      style={{ boxShadow: `12px 12px 0px ${THEMES[themeId]?.accent || '#4a3424'}`, borderColor: THEMES[themeId]?.accent || '#4a3424' }}
     />
   );
 };

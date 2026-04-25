@@ -5,7 +5,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { AnimatePresence } from 'motion/react';
-import { GameCanvas } from './components/GameCanvas';
+import { GameCanvas, THEMES } from './components/GameCanvas';
 import { Splash } from './components/Splash';
 import { Overlay } from './components/Overlay';
 import { GameStatus } from './types';
@@ -20,6 +20,7 @@ export default function App() {
   const [stage, setStage] = useState(1);
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(3);
+  const [themeId, setThemeId] = useState('teahouse');
   const [userProfile, setUserProfile] = useState<any>(null);
 
   useEffect(() => {
@@ -117,9 +118,19 @@ export default function App() {
   }, []);
 
   return (
-    <div className="w-full h-screen bg-[#f4ece1] text-[#4a3424] font-sans overflow-hidden relative flex flex-col">
+    <div 
+      className="w-full h-screen font-sans overflow-hidden relative flex flex-col transition-colors duration-500"
+      style={{ backgroundColor: THEMES[themeId]?.bg || '#f4ece1', color: THEMES[themeId]?.accent || '#4a3424' }}
+    >
       {/* Top Navigation Bar */}
-      <nav className="bg-[#d97706] border-b-[4px] border-[#4a3424] px-6 py-4 flex justify-between items-center fixed top-0 w-full z-[100] shadow-[0_4px_0px_#4a3424]">
+      <nav 
+        className="border-b-[4px] px-6 py-4 flex justify-between items-center fixed top-0 w-full z-[100] shadow-[0_4px_0px_#4a3424] transition-colors duration-500"
+        style={{ 
+          backgroundColor: THEMES[themeId]?.wall || '#d97706', 
+          borderColor: THEMES[themeId]?.accent || '#4a3424',
+          boxShadow: `0 4px 0px ${THEMES[themeId]?.accent || '#4a3424'}`
+        }}
+      >
         <div className="flex items-center gap-4">
           <div className="font-sans font-black text-[#fef3c7] text-xl tracking-tight uppercase">DIM SUM MAZE</div>
           <div className="h-6 w-[2px] bg-[#4a3424]"></div>
@@ -169,16 +180,17 @@ export default function App() {
       </nav>
 
       {/* Main Game Area */}
-      <main className="flex-grow flex items-center justify-center p-8 pt-24 bg-[#f4ece1] relative">
+      <main className="flex-grow flex items-center justify-center p-8 pt-24 relative transition-colors duration-500" style={{ backgroundColor: THEMES[themeId]?.bg || '#f4ece1' }}>
         <AnimatePresence>
           {status === 'SPLASH' && (
-            <Splash onStart={handleStart} />
+            <Splash onStart={handleStart} themeId={themeId} onThemeChange={setThemeId} />
           )}
         </AnimatePresence>
 
         {(status === 'PLAYING' || status === 'PAUSED' || status === 'STAGE_TRANSITION') && (
           <GameCanvas 
             stage={stage} 
+            themeId={themeId}
             onGameOver={handleGameOver} 
             onVictory={handleVictory}
             onScoreUpdate={handleScoreUpdate}
