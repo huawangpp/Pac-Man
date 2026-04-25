@@ -132,10 +132,10 @@ export default function App() {
         }}
       >
         <div className="flex items-center gap-4">
-          <div className="font-sans font-black text-[#fef3c7] text-xl tracking-tight uppercase">DIM SUM MAZE</div>
-          <div className="h-6 w-[2px] bg-[#4a3424]"></div>
-          <div id="status-tag" className={`text-[10px] font-bold uppercase tracking-widest ${status === 'PLAYING' ? 'text-[#fef3c7]' : 'text-orange-200'}`}>
-            {status === 'PLAYING' ? 'In Service' : status}
+          <div className="font-sans font-black text-white text-xl tracking-tight uppercase px-3 py-1 bg-black/40 rounded-lg border border-black/20 text-shadow-sm shadow-sm" style={{ textShadow: `1px 1px 0px ${THEMES[themeId]?.accent || '#4a3424'}` }}>DIM SUM MAZE</div>
+          <div className="h-6 w-[2px] bg-[#4a3424]" style={{ backgroundColor: THEMES[themeId]?.accent || '#4a3424' }}></div>
+          <div id="status-tag" className={`text-xs font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full ${status === 'PLAYING' ? 'bg-[#2d1e15] text-yellow-300' : 'bg-red-900 text-white'}`}>
+            {status === 'PLAYING' ? 'PAC-MAZE IN SERVICE' : status}
           </div>
           <div className="flex gap-1 ml-4">
             {Array.from({ length: lives }).map((_, i) => (
@@ -147,15 +147,15 @@ export default function App() {
         <div className="flex items-center gap-4">
           {user ? (
             <div className="flex items-center gap-3">
-              <div className="flex flex-col items-end">
-                <span className="text-xs font-bold text-white leading-none">{user.displayName}</span>
+              <div className="flex flex-col items-end px-3 py-1 bg-black/40 rounded-lg border border-black/20 shadow-sm">
+                <span className="text-xs font-bold text-white leading-none" style={{ textShadow: `1px 1px 0px ${THEMES[themeId]?.accent || '#4a3424'}` }}>{user.displayName}</span>
                 {userProfile && (
-                  <span className="text-[10px] text-yellow-300 flex items-center gap-1 font-bold mt-1">
+                  <span className="text-[10px] text-yellow-300 flex items-center gap-1 font-bold mt-1" style={{ textShadow: `1px 1px 0px ${THEMES[themeId]?.accent || '#4a3424'}` }}>
                     <Trophy size={10} /> BEST: {userProfile.highScore}
                   </span>
                 )}
               </div>
-              <img src={user.photoURL || ''} alt="" className="w-8 h-8 rounded-full border-2 border-[#4a3424] shadow-sm" />
+              <img src={user.photoURL || ''} alt="" className="w-8 h-8 rounded-full border-2 shadow-sm" style={{ borderColor: THEMES[themeId]?.accent || '#4a3424' }} />
               <button 
                 onClick={() => logout()}
                 className="p-2 text-orange-200 hover:text-white transition-colors"
@@ -173,8 +173,8 @@ export default function App() {
             </button>
           )}
 
-          <div className="bg-[#4a3424] border-2 border-[#fef3c7] px-4 py-2 rounded-xl">
-            <div className="text-xs text-[#fef3c7] uppercase font-black">Points: <span className="text-white ml-2">{score}</span></div>
+          <div className="bg-[#2d1e15] border-2 border-yellow-500 px-4 py-2 rounded-xl">
+            <div className="text-xs text-yellow-500 uppercase font-black">Points: <span className="text-white ml-2 text-sm">{score}</span></div>
           </div>
         </div>
       </nav>

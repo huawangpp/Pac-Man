@@ -106,7 +106,7 @@ class MainScene extends Phaser.Scene {
   moveSpeed: number = 160;
   ghostSpeed: number = 110;
   gameActive: boolean = true;
-  respawnQueue: number[] = [];
+  respawnQueue: { color: number; role: string }[] = [];
   queuedDirection: string | null = null;
   currentDirection: string | null = null;
   maze: number[][] = [];
@@ -263,11 +263,9 @@ class MainScene extends Phaser.Scene {
     const midX = Math.floor(width / 2);
     const midY = Math.floor(height / 2);
 
-    // Open Tunnels on sides
-    maze[midY][0] = 0;
-    maze[midY][1] = 0;
-    maze[midY][width - 2] = 0;
-    maze[midY][width - 1] = 0;
+    // Open Tunnels on sides and ensure clear path to them
+    for (let x = 0; x < 4; x++) maze[midY][x] = 0;
+    for (let x = width - 4; x < width; x++) maze[midY][x] = 0;
 
     // Player spawn area - clarify paths
     for (let y = 1; y <= 2; y++) {
@@ -284,8 +282,18 @@ class MainScene extends Phaser.Scene {
         maxY: midY + 1
     };
 
-    // Entrance to ghost house
-    maze[midY-2][midX] = 0;
+    // Carve ghost house
+    for (let y = ghostArea.minY; y <= ghostArea.maxY; y++) {
+      for (let x = ghostArea.minX; x <= ghostArea.maxX; x++) {
+        maze[y][x] = 0;
+      }
+    }
+
+    // Exits from ghost house
+    maze[midY - 2][midX] = 0;
+    maze[midY + 2][midX] = 0;
+    maze[midY][midX - 3] = 0;
+    maze[midY][midX + 3] = 0;
 
     // Add some random loops (remove random walls)
     for (let i = 0; i < 15; i++) {
@@ -365,6 +373,22 @@ class MainScene extends Phaser.Scene {
     });
   }
 
+  createPoofEffect(x: number, y: number) {
+    for (let i = 0; i < 10; i++) {
+      const p = this.add.circle(x, y, 4, 0xffffff);
+      this.physics.add.existing(p);
+      const b = p.body as Phaser.Physics.Arcade.Body;
+      b.setVelocity(Math.random() * 300 - 150, Math.random() * 300 - 150);
+      this.tweens.add({
+        targets: p,
+        alpha: 0,
+        scale: 0.1,
+        duration: 600,
+        onComplete: () => p.destroy()
+      });
+    }
+  }
+
   create() {
     this.maze = this.generateMazeLayout();
 
@@ -381,6 +405,14 @@ class MainScene extends Phaser.Scene {
     this.dots = this.physics.add.group();
     this.powers = this.physics.add.group();
     this.ghosts = this.physics.add.group();
+
+    // Set world bounds to be larger than the screen to allow smooth tunneling
+    const worldWidth = 25 * 32;
+    const worldHeight = 19 * 32;
+    this.physics.world.setBounds(-64, 0, worldWidth + 128, worldHeight);
+    // Disable collision with world bounds
+    this.physics.world.checkCollision.left = false;
+    this.physics.world.checkCollision.right = false;
 
     this.maze.forEach((row, y) => {
       row.forEach((tile, x) => {
@@ -439,6 +471,10 @@ class MainScene extends Phaser.Scene {
     g.setData('color', color);
     g.setData('dir', dir);
     g.setData('role', role);
+    g.setData('isReturning', false);
+    g.setAlpha(1);
+    g.setScale(1);
+    g.body.enable = true;
     g.body.setCircle(12, 4, 4);
     this.physics.add.collider(g, this.walls);
   }
@@ -492,27 +528,48 @@ class MainScene extends Phaser.Scene {
       });
 
       while (this.respawnQueue.length > 0) {
-        const color = this.respawnQueue.shift();
-        if (color !== undefined) {
+        const item = this.respawnQueue.shift();
+        if (item !== undefined) {
           const midX = Math.floor(25 / 2) * 32 + 16;
           const midY = Math.floor(19 / 2) * 32 + 16;
-          const roles = ['chase', 'ambush', 'patrol', 'shy'];
-          const role = roles[this.respawnQueue.length % roles.length];
-          this.createGhost(midX, midY, color, 'up', role);
+          this.createGhost(midX, midY, item.color, 'up', item.role);
         }
       }
     });
   }
 
   hitGhost(_: any, g: any) {
-    if (this.isPowerMode) {
+    if (this.isPowerMode && !g.getData('isReturning')) {
       const color = g.getData('color');
       this.sfx.catch();
-      g.destroy();
+      
+      this.createPoofEffect(g.x, g.y);
+      
+      g.setData('isReturning', true);
+      g.body.enable = false;
+      g.setAlpha(0.4);
+      g.setTint(0xffffff);
+      this.tweens.killTweensOf(g);
+      g.setScale(0.7);
+      
+      const midX = Math.floor(25 / 2) * 32 + 16;
+      const midY = Math.floor(19 / 2) * 32 + 16;
+      
+      this.tweens.add({
+        targets: g,
+        x: midX,
+        y: midY,
+        duration: 1000,
+        ease: 'Cubic.easeOut',
+        onComplete: () => {
+          this.respawnQueue.push({ color, role: g.getData('role') });
+          g.destroy();
+        }
+      });
+      
       this.score += 200;
       this.onScoreUpdateCallback(this.score);
-      this.respawnQueue.push(color);
-    } else {
+    } else if (!this.isPowerMode && !g.getData('isReturning')) {
       this.sfx.death();
       this.physics.pause();
       this.gameActive = false;
@@ -560,13 +617,21 @@ class MainScene extends Phaser.Scene {
         child.x = pos.x;
         child.y = pos.y;
         child.setVelocity(0);
+        child.setData('isReturning', false);
+        child.body.enable = true;
+        child.setAlpha(1);
+        child.setScale(1);
+        child.setTint(child.getData('color'));
     });
   }
 
   checkWall(x: number, y: number) {
     const tx = Math.floor(x / 32), ty = Math.floor(y / 32);
-    if (ty < 0 || ty >= this.maze.length) return false;
-    if (tx < 0 || tx >= this.maze[0].length) return false;
+    if (ty < 0 || ty >= this.maze.length) return true;
+    if (tx < 0 || tx >= this.maze[0].length) {
+      if (ty === Math.floor(19 / 2)) return false;
+      return true;
+    }
     return this.maze[ty][tx] === 1;
   }
 
@@ -631,13 +696,16 @@ class MainScene extends Phaser.Scene {
 
     // Tunneling
     const worldWidth = 25 * 32;
-    if (this.player.x < -16) this.player.x = worldWidth + 16;
-    if (this.player.x > worldWidth + 16) this.player.x = -16;
+    if (this.player.x < -32) {
+      this.player.x = worldWidth + 30;
+    } else if (this.player.x > worldWidth + 32) {
+      this.player.x = -30;
+    }
 
-    this.ghosts.getChildren().forEach((g: any) => {
+    this.ghosts.getChildren().forEach((g: any, index: number) => {
+      if (g.getData('isReturning')) return;
       const speed = this.isPowerMode ? this.ghostSpeed * 0.5 : this.ghostSpeed;
       let dir = g.getData('dir');
-      const role = g.getData('role');
       const gx = g.x, gy = g.y;
       
       const centerX = Math.floor(gx / 32) * 32 + 16;
@@ -651,10 +719,11 @@ class MainScene extends Phaser.Scene {
       else if (dir === 'down') blocked = this.checkWall(gx, gy + 20);
 
       if (blocked || isAtCenter) {
-        const canContinue = !blocked;
-        const opts = (['left', 'right', 'up', 'down'] as string[]).filter(d => {
-          const reverseMap: Record<string, string> = { left: 'right', right: 'left', up: 'down', down: 'up' };
-          if (!blocked && d === reverseMap[dir]) return false;
+        const reverseMap: Record<string, string> = { left: 'right', right: 'left', up: 'down', down: 'up' };
+        let opts = (['left', 'right', 'up', 'down'] as string[]).filter(d => {
+          // Tunnel zone allows reversing
+          const inTunnelZone = (gx < 32 || gx > worldWidth - 32);
+          if (!inTunnelZone && d === reverseMap[dir]) return false;
           
           if (d === 'left') return !this.checkWall(gx - 32, gy);
           if (d === 'right') return !this.checkWall(gx + 32, gy);
@@ -663,74 +732,98 @@ class MainScene extends Phaser.Scene {
           return false;
         });
 
+        // Fallback: if no forward options, allow reversing
+        if (opts.length === 0) {
+          const rev = reverseMap[dir];
+          if (rev) opts = [rev];
+        }
+
         if (opts.length > 0) {
+          let newDir = dir;
           if (this.isPowerMode) {
-             // Frightened: Random movement
-             if (blocked || Math.random() < 0.3) {
-               dir = Phaser.Utils.Array.GetRandom(opts);
-             }
+             newDir = Phaser.Utils.Array.GetRandom(opts);
           } else {
              // AI Decisions
              let target = { x: this.player.x, y: this.player.y };
+             const gColor = g.getData('color');
+             const isScatter = (this.time.now % 27000) < 7000; // 7s scatter, 20s chase cycle
              
-             if (role === 'ambush') {
-               // Pinky style: target ahead
-               const pvx = this.player.body.velocity.x;
-               const pvy = this.player.body.velocity.y;
-               target.x += (pvx / this.moveSpeed) * 32 * 4;
-               target.y += (pvy / this.moveSpeed) * 32 * 4;
-             } else if (role === 'patrol') {
-               // Patrol top right corner area
-               target = { x: (25 - 2) * 32, y: 32 * 2 };
-             } else if (role === 'shy') {
-               // Clyde style: switch between chasing and fleeing
-               const dist = Phaser.Math.Distance.Between(gx, gy, this.player.x, this.player.y);
-               if (dist < 32 * 6) {
-                 target = { x: 32, y: (19-2) * 32 }; // Flee to bottom left
+             if (gx < 32 || gx > worldWidth - 32) {
+               target = { x: dir === 'left' ? -1000 : worldWidth + 1000, y: gy };
+             } else if (gColor === 0xff4444) { // Red - Blinky
+               target = isScatter ? { x: 23 * 32, y: 2 * 32 } : { x: this.player.x, y: this.player.y };
+             } else if (gColor === 0xec4899) { // Pink - Pinky
+               if (isScatter) {
+                 target = { x: 2 * 32, y: 2 * 32 };
+               } else {
+                 const pvx = this.player.body.velocity.x;
+                 const pvy = this.player.body.velocity.y;
+                 target = {
+                   x: this.player.x + (pvx > 0 ? 128 : (pvx < 0 ? -128 : 0)),
+                   y: this.player.y + (pvy > 0 ? 128 : (pvy < 0 ? -128 : 0))
+                 };
+               }
+             } else if (gColor === 0x22c55e) { // Green - Inky (Mirrored)
+               target = isScatter ? { x: 23 * 32, y: 17 * 32 } : { 
+                 x: worldWidth - this.player.x, 
+                 y: (19 * 32) - this.player.y 
+               };
+             } else { // Cyan - Clyde
+               const distToPlayer = Phaser.Math.Distance.Between(gx, gy, this.player.x, this.player.y);
+               if (isScatter || distToPlayer < (8 * 32)) {
+                 target = { x: 2 * 32, y: 17 * 32 }; // Scatters if close or in scatter mode
+               } else {
+                 target = { x: this.player.x, y: this.player.y };
                }
              }
 
-             // Find best direction
-             let bestDir = dir;
-             if (blocked || isAtCenter) {
-               let minDist = Infinity;
-               opts.forEach(o => {
-                 let nx = centerX, ny = centerY;
-                 if (o === 'left') nx -= 32;
-                 if (o === 'right') nx += 32;
-                 if (o === 'up') ny -= 32;
-                 if (o === 'down') ny += 32;
-                 const d = Phaser.Math.Distance.Between(nx, ny, target.x, target.y);
-                 if (d < minDist) {
-                   minDist = d;
-                   bestDir = o;
-                 }
-               });
-               
-               // Some randomness to prevent perfect stacking
-               if (Math.random() < 0.05 && opts.length > 1) {
-                 bestDir = Phaser.Utils.Array.GetRandom(opts);
+             // Minor offset to break perfect overlapping if they happen to share a tile
+             target.x += (index * 8 - 12);
+             target.y += (index * 8 - 12);
+
+             let bestDir = opts[0];
+             let minDist = Infinity;
+             opts.forEach(o => {
+               let nx = centerX, ny = centerY;
+               if (o === 'left') nx -= 32;
+               if (o === 'right') nx += 32;
+               if (o === 'up') ny -= 32;
+               if (o === 'down') ny += 32;
+               const dist = Phaser.Math.Distance.Between(nx, ny, target.x, target.y);
+               if (dist < minDist) {
+                 minDist = dist;
+                 bestDir = o;
                }
-               dir = bestDir;
+             });
+             
+             // High random factor (15%) to break stacks
+             if (Math.random() < 0.15 && opts.length > 1) {
+               bestDir = Phaser.Utils.Array.GetRandom(opts);
              }
+             newDir = bestDir;
           }
-          
-          if (dir !== g.getData('dir')) {
+
+          if (blocked || newDir !== dir) {
             g.x = centerX;
             g.y = centerY;
-            g.setData('dir', dir);
+            g.setData('dir', newDir);
+            dir = newDir;
           }
         }
       }
-      if (dir === 'left') g.setVelocity(-speed, 0);
-      else if (dir === 'right') g.setVelocity(speed, 0);
-      else if (dir === 'up') g.setVelocity(0, -speed);
-      else if (dir === 'down') g.setVelocity(0, speed);
+      
+      g.setVelocity(0);
+      if (dir === 'left') g.setVelocityX(-speed);
+      else if (dir === 'right') g.setVelocityX(speed);
+      else if (dir === 'up') g.setVelocityY(-speed);
+      else if (dir === 'down') g.setVelocityY(speed);
 
-      // Ghost Tunneling
-      const worldWidth = 25 * 32;
-      if (g.x < -16) g.x = worldWidth + 16;
-      if (g.x > worldWidth + 16) g.x = -16;
+      // Improved Ghost Tunneling
+      if (g.x < -32) {
+        g.x = worldWidth + 31;
+      } else if (g.x > worldWidth + 32) {
+        g.x = -31;
+      }
     });
   }
 }
