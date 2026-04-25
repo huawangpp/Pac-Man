@@ -1,0 +1,6 @@
+{
+  "name": "Pac-Man Arcade",
+  "description": "A classic arcade-style Pac-Man game with multiple stages, increasing difficulty, and polished effects.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
