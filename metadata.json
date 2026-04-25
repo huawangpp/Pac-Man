@@ -1,6 +1,6 @@
 {
-  "name": "Pac-Man Arcade",
-  "description": "A classic arcade-style Pac-Man game with multiple stages, increasing difficulty, and polished effects.",
+  "name": "Dim Sum Maze Time",
+  "description": "An authentic dim sum themed arcade maze game. Gather sesame seeds, eat dumplings, and avoid hungry ghosts across multiple courses.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }

@@ -6,6 +6,8 @@ interface GameCanvasProps {
   onGameOver: (score: number) => void;
   onVictory: (score: number) => void;
   onScoreUpdate: (score: number) => void;
+  onLoseLife: () => void;
+  lives: number;
   status: 'PLAYING' | 'PAUSED' | 'STAGE_TRANSITION' | 'SPLASH' | 'GAMEOVER' | 'VICTORY';
 }
 
@@ -73,59 +75,89 @@ class MainScene extends Phaser.Scene {
   onGameOverCallback: (score: number) => void;
   onVictoryCallback: (score: number) => void;
   onScoreUpdateCallback: (score: number) => void;
+  onLoseLifeCallback: () => void;
   stage: number;
+  lives: number;
 
   constructor(
     onGameOver: (score: number) => void,
     onVictory: (score: number) => void,
     onScoreUpdate: (score: number) => void,
-    stage: number
+    onLoseLife: () => void,
+    stage: number,
+    lives: number
   ) {
     super('MainScene');
     this.sfx = new SoundSynth();
     this.onGameOverCallback = onGameOver;
     this.onVictoryCallback = onVictory;
     this.onScoreUpdateCallback = onScoreUpdate;
+    this.onLoseLifeCallback = onLoseLife;
     this.stage = stage;
+    this.lives = lives;
   }
 
   preload() {
+    // Power - Dumpling Emoji
+    const powerCanvas = this.textures.createCanvas('power', 32, 32);
+    if (powerCanvas) {
+      const ctx = powerCanvas.getContext();
+      ctx.font = '24px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🥟', 16, 16);
+      powerCanvas.refresh();
+    }
+
     const g = this.add.graphics();
     
-    // Player
-    g.fillStyle(0xffff00);
+    // Player - Chef character in Pacman style
+    g.lineStyle(2, 0x4a3424);
+    g.fillStyle(0xfacc15);
     g.fillCircle(16, 16, 14);
-    g.fillStyle(0x020617);
+    g.strokeCircle(16, 16, 14);
+    
+    g.fillStyle(0xf4ece1); // Matches background for mouth
     g.beginPath();
     g.moveTo(16, 16);
     g.lineTo(32, 8);
     g.lineTo(32, 24);
     g.closePath();
     g.fillPath();
+    
+    // Tiny Chef hat line or just eye
+    g.fillStyle(0x4a3424);
+    g.fillCircle(20, 8, 2);
+    
     g.generateTexture('player', 32, 32);
     g.clear();
 
-    // Wall
-    g.fillStyle(0x1e1b4b);
-    g.fillRoundedRect(2, 2, 28, 28, 4);
-    g.lineStyle(2, 0x6366f1);
-    g.strokeRoundedRect(2, 2, 28, 28, 4);
+    // Wall - Steamer Basket theme
+    g.fillStyle(0xd97706); // Wood/Bamboo color
+    g.fillRoundedRect(2, 2, 28, 28, 6);
+    g.lineStyle(3, 0x4a3424);
+    g.strokeRoundedRect(2, 2, 28, 28, 6);
+    
+    // Add some bamboo texture lines
+    g.lineStyle(1, 0x4a3424, 0.3);
+    g.moveTo(8, 4); g.lineTo(8, 28);
+    g.moveTo(16, 4); g.lineTo(16, 28);
+    g.moveTo(24, 4); g.lineTo(24, 28);
+    g.strokePath();
+    
     g.generateTexture('wall', 32, 32);
     g.clear();
 
-    // Dot
-    g.fillStyle(0xfacc15);
-    g.fillCircle(16, 16, 3);
+    // Dot - Golden Sesame
+    g.fillStyle(0x4a3424); // Outline for dot
+    g.fillCircle(16, 16, 4);
+    g.fillStyle(0xd97706);
+    g.fillCircle(16, 16, 2.5);
     g.generateTexture('dot', 32, 32);
     g.clear();
 
-    // Power
-    g.fillStyle(0xffffff);
-    g.fillCircle(16, 16, 8);
-    g.generateTexture('power', 32, 32);
-    g.clear();
-
-    // Ghost
+    // Ghost - Tea Ghost style
+    g.lineStyle(2, 0x4a3424);
     g.fillStyle(0xffffff);
     g.beginPath();
     g.arc(16, 14, 12, Math.PI, 0);
@@ -136,13 +168,20 @@ class MainScene extends Phaser.Scene {
     g.lineTo(4, 28);
     g.closePath();
     g.fillPath();
+    g.strokePath();
+    
+    // Eyes
+    g.fillStyle(0x4a3424);
+    g.fillCircle(12, 12, 2);
+    g.fillCircle(20, 12, 2);
+    
     g.generateTexture('ghost', 32, 32);
     g.destroy();
   }
 
   generateMazeLayout() {
-    const width = 19;
-    const height = 15;
+    const width = 25;
+    const height = 19;
     const maze = Array.from({ length: height }, () => Array(width).fill(1));
 
     // Recursive Backtracking Maze Generation
@@ -219,35 +258,46 @@ class MainScene extends Phaser.Scene {
   }
 
   createDotEffect(x: number, y: number, color: number = 0xfacc15) {
-    for (let i = 0; i < 4; i++) {
-        const p = this.add.circle(x, y, 2, color);
+    for (let i = 0; i < 6; i++) {
+        const p = this.add.circle(x, y, 3, color);
         this.physics.add.existing(p);
         const body = p.body as Phaser.Physics.Arcade.Body;
         body.setVelocity(
-            Math.random() * 200 - 100,
-            Math.random() * 200 - 100
+            Math.random() * 260 - 130,
+            Math.random() * 260 - 130
         );
         this.tweens.add({
             targets: p,
             alpha: 0,
             scale: 0.1,
-            duration: 400,
+            duration: 500,
             onComplete: () => p.destroy()
         });
     }
 
     // Floating text
     const text = this.add.text(x, y - 10, '+10', {
-        fontSize: '12px',
-        fontFamily: '"Press Start 2P"',
-        color: '#ffffff'
+        fontSize: '14px',
+        fontFamily: 'sans-serif',
+        fontStyle: 'bold',
+        color: '#ffffff',
+        stroke: '#4a3424',
+        strokeThickness: 3
     }).setOrigin(0.5);
     this.tweens.add({
         targets: text,
-        y: y - 40,
+        y: y - 50,
         alpha: 0,
-        duration: 600,
+        duration: 800,
         onComplete: () => text.destroy()
+    });
+
+    // Player pulse
+    this.tweens.add({
+      targets: this.player,
+      scale: 1.2,
+      duration: 50,
+      yoyo: true
     });
   }
 
@@ -273,18 +323,25 @@ class MainScene extends Phaser.Scene {
         const px = x * 32 + 16, py = y * 32 + 16;
         if (tile === 1) this.walls.create(px, py, 'wall');
         else if (tile === 2) this.dots.create(px, py, 'dot');
-        else if (tile === 4) this.powers.create(px, py, 'power');
+        else if (tile === 4) {
+          this.powers.create(px, py, 'power');
+        }
       });
     });
 
     this.player = this.physics.add.sprite(32 + 16, 32 + 16, 'player');
     this.player.body.setCircle(10, 6, 6);
 
-    this.createGhost(304, 176, 0xff4444, 'left');
-    this.createGhost(240, 240, 0x22c55e, 'right');
-    this.createGhost(368, 240, 0xec4899, 'up');
+    const midX = Math.floor(25 / 2);
+    const midY = Math.floor(19 / 2);
+    const mx = midX * 32 + 16;
+    const my = midY * 32 + 16;
 
-    if (this.stage >= 2) this.createGhost(304, 240, 0x00ffff, 'down');
+    this.createGhost(mx, my - 64, 0xff4444, 'left');
+    this.createGhost(mx - 64, my, 0x22c55e, 'right');
+    this.createGhost(mx + 64, my, 0xec4899, 'up');
+
+    if (this.stage >= 2) this.createGhost(mx, my, 0x00ffff, 'down');
 
     this.physics.add.collider(this.player, this.walls);
     this.physics.add.overlap(this.player, this.dots, (_, d: any) => {
@@ -360,10 +417,50 @@ class MainScene extends Phaser.Scene {
       this.physics.pause();
       this.gameActive = false;
       this.player.setTint(0xff0000);
-      this.time.delayedCall(1000, () => {
-        this.onGameOverCallback(this.score);
-      });
+      this.lives--;
+      this.onLoseLifeCallback();
+
+      if (this.lives > 0) {
+        this.time.delayedCall(1500, () => {
+          this.resetRespawn();
+        });
+      } else {
+        this.time.delayedCall(1500, () => {
+          this.onGameOverCallback(this.score);
+        });
+      }
     }
+  }
+
+  resetRespawn() {
+    this.player.clearTint();
+    this.player.x = 32 + 16;
+    this.player.y = 32 + 16;
+    this.currentDirection = null;
+    this.queuedDirection = null;
+    this.player.setVelocity(0);
+    this.physics.resume();
+    this.gameActive = true;
+
+    // Reset ghosts to start positions
+    const midX = Math.floor(25 / 2) * 32 + 16;
+    const midY = Math.floor(19 / 2) * 32 + 16;
+    
+    // We don't want to destroy and recreate as we might lose state or have issues with complexity
+    // Let's just snap them back
+    const ghostPositions = [
+        { x: midX, y: midY - 64 },
+        { x: midX - 64, y: midY },
+        { x: midX + 64, y: midY },
+        { x: midX, y: midY }
+    ];
+    
+    this.ghosts.getChildren().forEach((child: any, i) => {
+        const pos = ghostPositions[i] || { x: 304, y: 240 };
+        child.x = pos.x;
+        child.y = pos.y;
+        child.setVelocity(0);
+    });
   }
 
   checkWall(x: number, y: number) {
@@ -431,8 +528,8 @@ class MainScene extends Phaser.Scene {
     }
 
     // Tunneling
-    if (this.player.x < 0) this.player.x = 608;
-    if (this.player.x > 608) this.player.x = 0;
+    if (this.player.x < 0) this.player.x = 25 * 32;
+    if (this.player.x > 25 * 32) this.player.x = 0;
 
     this.ghosts.getChildren().forEach((g: any) => {
       const speed = this.isPowerMode ? this.ghostSpeed * 0.5 : this.ghostSpeed;
@@ -481,8 +578,8 @@ class MainScene extends Phaser.Scene {
       else if (dir === 'down') g.setVelocity(0, speed);
 
       // Ghost Tunneling
-      if (g.x < 0) g.x = 608;
-      if (g.x > 608) g.x = 0;
+      if (g.x < 0) g.x = 25 * 32;
+      if (g.x > 25 * 32) g.x = 0;
     });
   }
 }
@@ -492,24 +589,26 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   onGameOver,
   onVictory,
   onScoreUpdate,
+  onLoseLife,
+  lives,
   status
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
 
   // Store callbacks in refs so we can access current versions without triggering effect re-runs
-  const callbacksRef = useRef({ onGameOver, onVictory, onScoreUpdate });
+  const callbacksRef = useRef({ onGameOver, onVictory, onScoreUpdate, onLoseLife });
   useEffect(() => {
-    callbacksRef.current = { onGameOver, onVictory, onScoreUpdate };
-  }, [onGameOver, onVictory, onScoreUpdate]);
+    callbacksRef.current = { onGameOver, onVictory, onScoreUpdate, onLoseLife };
+  }, [onGameOver, onVictory, onScoreUpdate, onLoseLife]);
 
   useEffect(() => {
     if (!containerRef.current || gameRef.current) return;
 
     const config: Phaser.Types.Core.GameConfig = {
       type: Phaser.AUTO,
-      width: 608,
-      height: 480,
+      width: 25 * 32,
+      height: 19 * 32,
       parent: containerRef.current,
       physics: {
         default: 'arcade',
@@ -518,9 +617,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         (s) => callbacksRef.current.onGameOver(s),
         (s) => callbacksRef.current.onVictory(s),
         (s) => callbacksRef.current.onScoreUpdate(s),
-        stage
+        () => callbacksRef.current.onLoseLife(),
+        stage,
+        lives
       ),
-      backgroundColor: '#020617',
+      backgroundColor: '#f4ece1', // Authentic Paper/Cloth background
     };
 
     gameRef.current = new Phaser.Game(config);
@@ -551,7 +652,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   return (
     <div
       ref={containerRef}
-      className="rounded-lg shadow-[0_0_50px_rgba(139,92,246,0.3)] border-4 border-blue-900/50 overflow-hidden"
+      className="rounded-[2.5rem] shadow-[12px_12px_0px_#4a3424] border-[6px] border-[#4a3424] overflow-hidden"
     />
   );
 };

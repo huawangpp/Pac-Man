@@ -19,6 +19,7 @@ export default function App() {
   const [status, setStatus] = useState<GameStatus>('SPLASH');
   const [stage, setStage] = useState(1);
   const [score, setScore] = useState(0);
+  const [lives, setLives] = useState(3);
   const [userProfile, setUserProfile] = useState<any>(null);
 
   useEffect(() => {
@@ -32,7 +33,18 @@ export default function App() {
   const handleStart = useCallback(() => {
     setStatus('PLAYING');
     setScore(0);
+    setLives(3);
     setStage(1);
+  }, []);
+
+  const handleLoseLife = useCallback(() => {
+    setLives(prev => {
+      const newLives = prev - 1;
+      if (newLives <= 0) {
+        // Game Over handled by GameCanvas calling handleGameOver
+      }
+      return newLives;
+    });
   }, []);
 
   const handleGameOver = useCallback(async (finalScore: number) => {
@@ -105,14 +117,19 @@ export default function App() {
   }, []);
 
   return (
-    <div className="w-full h-screen bg-[#020617] text-white font-sans overflow-hidden relative flex flex-col">
+    <div className="w-full h-screen bg-[#f4ece1] text-[#4a3424] font-sans overflow-hidden relative flex flex-col">
       {/* Top Navigation Bar */}
-      <nav className="bg-[#0f172a]/90 backdrop-blur-md border-b border-white/10 px-6 py-4 flex justify-between items-center fixed top-0 w-full z-[100]">
+      <nav className="bg-[#d97706] border-b-[4px] border-[#4a3424] px-6 py-4 flex justify-between items-center fixed top-0 w-full z-[100] shadow-[0_4px_0px_#4a3424]">
         <div className="flex items-center gap-4">
-          <div className="font-pixel text-yellow-400 text-xs tracking-tighter">NEON DIM SUM</div>
-          <div className="h-6 w-[1px] bg-slate-700"></div>
-          <div id="status-tag" className={`text-[10px] font-bold uppercase tracking-widest ${status === 'PLAYING' ? 'text-emerald-400' : 'text-yellow-400'}`}>
-            Status: {status === 'PLAYING' ? 'Active' : status}
+          <div className="font-sans font-black text-[#fef3c7] text-xl tracking-tight uppercase">DIM SUM MAZE</div>
+          <div className="h-6 w-[2px] bg-[#4a3424]"></div>
+          <div id="status-tag" className={`text-[10px] font-bold uppercase tracking-widest ${status === 'PLAYING' ? 'text-[#fef3c7]' : 'text-orange-200'}`}>
+            {status === 'PLAYING' ? 'In Service' : status}
+          </div>
+          <div className="flex gap-1 ml-4">
+            {Array.from({ length: lives }).map((_, i) => (
+              <div key={i} className="w-4 h-4 bg-yellow-400 rounded-full border-2 border-[#4a3424] shadow-[2px_2px_0px_#4a3424]"></div>
+            ))}
           </div>
         </div>
         
@@ -120,17 +137,17 @@ export default function App() {
           {user ? (
             <div className="flex items-center gap-3">
               <div className="flex flex-col items-end">
-                <span className="text-[10px] font-bold text-white leading-none">{user.displayName}</span>
+                <span className="text-xs font-bold text-white leading-none">{user.displayName}</span>
                 {userProfile && (
-                  <span className="text-[8px] text-yellow-400 flex items-center gap-1 font-pixel mt-1">
-                    <Trophy size={8} /> BEST: {userProfile.highScore}
+                  <span className="text-[10px] text-yellow-300 flex items-center gap-1 font-bold mt-1">
+                    <Trophy size={10} /> BEST: {userProfile.highScore}
                   </span>
                 )}
               </div>
-              <img src={user.photoURL || ''} alt="" className="w-8 h-8 rounded-full border border-yellow-400/50" />
+              <img src={user.photoURL || ''} alt="" className="w-8 h-8 rounded-full border-2 border-[#4a3424] shadow-sm" />
               <button 
                 onClick={() => logout()}
-                className="p-2 text-slate-400 hover:text-red-400 transition-colors"
+                className="p-2 text-orange-200 hover:text-white transition-colors"
                 title="Logout"
               >
                 <LogOut size={16} />
@@ -139,20 +156,20 @@ export default function App() {
           ) : (
             <button 
               onClick={() => loginWithGoogle()}
-              className="flex items-center gap-2 bg-yellow-400 text-black px-4 py-1.5 rounded-lg font-bold text-[10px] uppercase hover:bg-yellow-300 transition-all active:scale-95"
+              className="flex items-center gap-2 bg-[#f4ece1] text-[#4a3424] px-4 py-1.5 rounded-full border-2 border-[#4a3424] font-bold text-[11px] uppercase hover:bg-white transition-all shadow-[2px_2px_0px_#4a3424] active:translate-y-1 active:shadow-none"
             >
-              <LogIn size={12} /> Login to Save Progress
+              <LogIn size={12} /> Login
             </button>
           )}
 
-          <div className="bg-[#0f172a]/90 border border-yellow-400/30 px-4 py-2 rounded-lg backdrop-blur-md">
-            <div className="text-[10px] text-slate-400 uppercase font-bold font-pixel">Score: <span className="text-white ml-2">{score}</span></div>
+          <div className="bg-[#4a3424] border-2 border-[#fef3c7] px-4 py-2 rounded-xl">
+            <div className="text-xs text-[#fef3c7] uppercase font-black">Points: <span className="text-white ml-2">{score}</span></div>
           </div>
         </div>
       </nav>
 
       {/* Main Game Area */}
-      <main className="flex-grow flex items-center justify-center p-8 pt-24 bg-[radial-gradient(circle_at_center,_rgba(139,92,246,0.1)_0%,_transparent_70%)] relative">
+      <main className="flex-grow flex items-center justify-center p-8 pt-24 bg-[#f4ece1] relative">
         <AnimatePresence>
           {status === 'SPLASH' && (
             <Splash onStart={handleStart} />
@@ -165,6 +182,8 @@ export default function App() {
             onGameOver={handleGameOver} 
             onVictory={handleVictory}
             onScoreUpdate={handleScoreUpdate}
+            onLoseLife={handleLoseLife}
+            lives={lives}
             status={status}
           />
         )}
@@ -194,9 +213,6 @@ export default function App() {
           )}
         </AnimatePresence>
       </main>
-
-      {/* CRT Flicker Overlay */}
-      <div className="absolute inset-0 pointer-events-none z-[200] opacity-[0.03] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,105,0.06))] bg-[length:100%_2px,3px_100%] animate-flicker"></div>
     </div>
   );
 }
