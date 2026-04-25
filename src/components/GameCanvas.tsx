@@ -195,20 +195,22 @@ class MainScene extends Phaser.Scene {
         }
     }
 
-    // Post-process: add dots everywhere there is a path EXCEPT in the ghost house
+    // Post-process: add dots everywhere there is a path EXCEPT in the ghost house, entrance, and player spawn
     for (let y = 1; y < height - 1; y++) {
       for (let x = 1; x < width - 1; x++) {
         if (maze[y][x] === 0) {
           const inGhostHouse = x >= ghostArea.minX && x <= ghostArea.maxX && y >= ghostArea.minY && y <= ghostArea.maxY;
-          if (!inGhostHouse) {
+          const atEntrance = x === midX && y === midY - 2;
+          const isPlayerSpawn = x === 1 && y === 1;
+          if (!inGhostHouse && !atEntrance && !isPlayerSpawn) {
             maze[y][x] = 2; // Fill path with dot
           }
         }
       }
     }
 
-    // Power Pellets at corners
-    const corners = [[1, 1], [width - 2, 1], [1, height - 2], [width - 2, height - 2]];
+    // Power Pellets at corners (excluding player spawn at 1,1)
+    const corners = [[width - 2, 1], [1, height - 2], [width - 2, height - 2]];
     corners.forEach(([cx, cy]) => {
       maze[cy][cx] = 4;
     });
