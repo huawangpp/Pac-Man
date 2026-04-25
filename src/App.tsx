@@ -3,17 +3,31 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { AnimatePresence } from 'motion/react';
 import { GameCanvas } from './components/GameCanvas';
 import { Splash } from './components/Splash';
 import { Overlay } from './components/Overlay';
 import { GameStatus } from './types';
+import { useFirebase } from './lib/FirebaseProvider';
+import { loginWithGoogle, logout, auth } from './lib/firebase';
+import { saveHighScore, syncUserProfile, getUserProfile } from './lib/gameService';
+import { LogIn, LogOut, Trophy } from 'lucide-react';
 
 export default function App() {
+  const { user } = useFirebase();
   const [status, setStatus] = useState<GameStatus>('SPLASH');
   const [stage, setStage] = useState(1);
   const [score, setScore] = useState(0);
+  const [userProfile, setUserProfile] = useState<any>(null);
+
+  useEffect(() => {
+    if (user) {
+      getUserProfile(user.uid).then(setUserProfile);
+    } else {
+      setUserProfile(null);
+    }
+  }, [user]);
 
   const handleStart = useCallback(() => {
     setStatus('PLAYING');
@@ -21,19 +35,59 @@ export default function App() {
     setStage(1);
   }, []);
 
-  const handleGameOver = useCallback((finalScore: number) => {
+  const handleGameOver = useCallback(async (finalScore: number) => {
     setScore(finalScore);
     setStatus('GAMEOVER');
-  }, []);
 
-  const handleVictory = useCallback((finalScore: number) => {
+    if (user) {
+      // Save global high score
+      await saveHighScore({
+        userId: user.uid,
+        displayName: user.displayName || 'Anonymous',
+        score: finalScore,
+        stage: stage
+      });
+
+      // Update personal best if applicable
+      if (!userProfile || finalScore > userProfile.highScore) {
+        await syncUserProfile(user.uid, {
+          displayName: user.displayName || 'Anonymous',
+          photoURL: user.photoURL || '',
+          highScore: Math.max(userProfile?.highScore || 0, finalScore)
+        });
+        // Refresh local profile
+        const updated = await getUserProfile(user.uid);
+        setUserProfile(updated);
+      }
+    }
+  }, [user, userProfile, stage]);
+
+  const handleVictory = useCallback(async (finalScore: number) => {
     setScore(finalScore);
     if (stage < 5) {
       setStatus('STAGE_TRANSITION');
     } else {
       setStatus('VICTORY');
+      if (user) {
+        await saveHighScore({
+          userId: user.uid,
+          displayName: user.displayName || 'Anonymous',
+          score: finalScore,
+          stage: stage
+        });
+        
+        if (!userProfile || finalScore > userProfile.highScore) {
+          await syncUserProfile(user.uid, {
+            displayName: user.displayName || 'Anonymous',
+            photoURL: user.photoURL || '',
+            highScore: Math.max(userProfile?.highScore || 0, finalScore)
+          });
+          const updated = await getUserProfile(user.uid);
+          setUserProfile(updated);
+        }
+      }
     }
-  }, [stage]);
+  }, [stage, user, userProfile]);
 
   const nextStage = useCallback(() => {
     setStage(prev => prev + 1);
@@ -61,7 +115,36 @@ export default function App() {
             Status: {status === 'PLAYING' ? 'Active' : status}
           </div>
         </div>
-        <div className="flex gap-4">
+        
+        <div className="flex items-center gap-4">
+          {user ? (
+            <div className="flex items-center gap-3">
+              <div className="flex flex-col items-end">
+                <span className="text-[10px] font-bold text-white leading-none">{user.displayName}</span>
+                {userProfile && (
+                  <span className="text-[8px] text-yellow-400 flex items-center gap-1 font-pixel mt-1">
+                    <Trophy size={8} /> BEST: {userProfile.highScore}
+                  </span>
+                )}
+              </div>
+              <img src={user.photoURL || ''} alt="" className="w-8 h-8 rounded-full border border-yellow-400/50" />
+              <button 
+                onClick={() => logout()}
+                className="p-2 text-slate-400 hover:text-red-400 transition-colors"
+                title="Logout"
+              >
+                <LogOut size={16} />
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={() => loginWithGoogle()}
+              className="flex items-center gap-2 bg-yellow-400 text-black px-4 py-1.5 rounded-lg font-bold text-[10px] uppercase hover:bg-yellow-300 transition-all active:scale-95"
+            >
+              <LogIn size={12} /> Login to Save Progress
+            </button>
+          )}
+
           <div className="bg-[#0f172a]/90 border border-yellow-400/30 px-4 py-2 rounded-lg backdrop-blur-md">
             <div className="text-[10px] text-slate-400 uppercase font-bold font-pixel">Score: <span className="text-white ml-2">{score}</span></div>
           </div>

@@ -1,0 +1,39 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with game stats",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string", "description": "Player name" },
+        "photoURL": { "type": "string", "description": "Avatar URL" },
+        "highScore": { "type": "number", "description": "Personal best score" },
+        "lastPlayed": { "type": "string", "format": "date-time", "description": "Last session timestamp" }
+      },
+      "required": ["displayName", "highScore"]
+    },
+    "HighScore": {
+      "title": "HighScore",
+      "description": "A single leaderboard entry",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Reference to the user" },
+        "displayName": { "type": "string", "description": "Name at time of score" },
+        "score": { "type": "number", "description": "The score achieved" },
+        "stage": { "type": "number", "description": "Stage reached" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "When the score was achieved" }
+      },
+      "required": ["userId", "displayName", "score", "timestamp"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "Public user profiles"
+    },
+    "highScores/{scoreId}": {
+      "schema": "HighScore",
+      "description": "Global leaderboard entries"
+    }
+  }
+}

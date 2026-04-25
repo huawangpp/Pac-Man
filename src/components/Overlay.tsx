@@ -1,5 +1,8 @@
 import React from 'react';
 import { motion } from 'motion/react';
+import { useFirebase } from '../lib/FirebaseProvider';
+import { LogIn } from 'lucide-react';
+import { loginWithGoogle } from '../lib/firebase';
 
 interface OverlayProps {
   type: 'STAGE' | 'GAMEOVER' | 'VICTORY';
@@ -9,6 +12,8 @@ interface OverlayProps {
 }
 
 export const Overlay: React.FC<OverlayProps> = ({ type, stage, score, onAction }) => {
+  const { user } = useFirebase();
+
   const config = {
     STAGE: {
       title: `STAGE ${stage} CLEAR`,
@@ -41,10 +46,28 @@ export const Overlay: React.FC<OverlayProps> = ({ type, stage, score, onAction }
         className={`bg-[#0f172a] border-2 ${config.borderColor} p-10 text-center rounded-2xl ${config.glow} w-full max-w-md`}
       >
         <h2 
-          className={`font-pixel text-2xl mb-8 ${config.color}`}
+          className={`font-pixel text-2xl mb-4 ${config.color}`}
         >
           {config.title}
         </h2>
+
+        {!user && (type === 'GAMEOVER' || type === 'VICTORY') && (
+          <div className="mb-6 p-4 rounded-lg bg-yellow-400/10 border border-yellow-400/20 text-yellow-400 flex flex-col items-center gap-3">
+            <p className="text-[10px] uppercase font-bold tracking-tight">Login to save this score!</p>
+            <button 
+              onClick={() => loginWithGoogle()}
+              className="flex items-center gap-2 bg-yellow-400 text-black px-4 py-2 rounded font-pixel text-[8px] hover:bg-yellow-300 transition-all"
+            >
+              <LogIn size={10} /> GOOGLE LOGIN
+            </button>
+          </div>
+        )}
+
+        {user && (type === 'GAMEOVER' || type === 'VICTORY') && (
+          <div className="mb-6 text-[10px] text-emerald-400 font-pixel uppercase animate-pulse">
+            Score Saved to Leaderboard
+          </div>
+        )}
         
         <div className="flex flex-col gap-2 mb-10 bg-black/40 p-6 rounded-xl border border-white/5">
           <span className="text-[10px] uppercase tracking-widest text-slate-400 font-pixel">Total Score</span>
