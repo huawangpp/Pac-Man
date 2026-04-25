@@ -490,14 +490,16 @@ class MainScene extends Phaser.Scene {
   startPowerMode() {
     this.isPowerMode = true;
     this.ghosts.getChildren().forEach((g: any) => {
-      g.setTint(0x3b82f6);
-      this.tweens.add({
-        targets: g,
-        scale: 1.3,
-        duration: 400,
-        yoyo: true,
-        repeat: -1
-      });
+      if (!g.getData('isReturning')) {
+        g.setTint(0x3b82f6);
+        this.tweens.add({
+          targets: g,
+          scale: 1.3,
+          duration: 400,
+          yoyo: true,
+          repeat: -1
+        });
+      }
     });
 
     if (this.pTimer) this.pTimer.remove();
@@ -507,13 +509,15 @@ class MainScene extends Phaser.Scene {
     this.fTimer = this.time.delayedCall(6000, () => {
       if (this.isPowerMode) {
         this.ghosts.getChildren().forEach((g: any) => {
-          this.tweens.add({
-            targets: g,
-            tint: 0xffffff,
-            duration: 200,
-            yoyo: true,
-            repeat: -1
-          });
+          if (!g.getData('isReturning')) {
+            this.tweens.add({
+              targets: g,
+              tint: 0xffffff,
+              duration: 200,
+              yoyo: true,
+              repeat: -1
+            });
+          }
         });
       }
     });
@@ -521,10 +525,12 @@ class MainScene extends Phaser.Scene {
     this.pTimer = this.time.delayedCall(8000, () => {
       this.isPowerMode = false;
       this.ghosts.getChildren().forEach((g: any) => {
-        this.tweens.killTweensOf(g);
-        g.setTint(g.getData('color'));
-        g.setScale(1);
-        g.setAlpha(1);
+        if (!g.getData('isReturning')) {
+          this.tweens.killTweensOf(g);
+          g.setTint(g.getData('color'));
+          g.setScale(1);
+          g.setAlpha(1);
+        }
       });
 
       while (this.respawnQueue.length > 0) {
@@ -562,7 +568,11 @@ class MainScene extends Phaser.Scene {
         duration: 1000,
         ease: 'Cubic.easeOut',
         onComplete: () => {
-          this.respawnQueue.push({ color, role: g.getData('role') });
+          if (this.isPowerMode) {
+            this.respawnQueue.push({ color, role: g.getData('role') });
+          } else {
+            this.createGhost(midX, midY, color, 'up', g.getData('role'));
+          }
           g.destroy();
         }
       });
